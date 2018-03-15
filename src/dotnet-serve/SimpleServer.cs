@@ -38,6 +38,9 @@ namespace McMaster.DotNet.Server
         [Option(Description = "Open a web browser when the server starts. [false]")]
         public bool OpenBrowser { get; }
 
+        [Option("--path-base <PATH>", Description = "The base URL path of postpended to the site url.")]
+        public string PathBase { get; private set; }
+
         public async Task<int> OnExecute(IConsole console)
         {
             var cts = new CancellationTokenSource();
@@ -51,6 +54,11 @@ namespace McMaster.DotNet.Server
             var path = Path != null
                 ? IOPath.GetFullPath(Path)
                 : Directory.GetCurrentDirectory();
+
+            if (!string.IsNullOrEmpty(PathBase) && PathBase[0] != '/')
+            {
+                PathBase = "/" + PathBase;
+            }
 
             var host = new WebHostBuilder()
                 .ConfigureLogging(l =>
@@ -75,6 +83,11 @@ namespace McMaster.DotNet.Server
                 .UseEnvironment("Production")
                 .Configure(app =>
                 {
+                    if (!string.IsNullOrEmpty(PathBase))
+                    {
+                        app.UsePathBase(PathBase);
+                    }
+
                     app.UseStatusCodePages("text/html",
                         "<html><head><title>Error {0}</title></head><body><h1>HTTP {0}</h1></body></html>");
                     app.UseFileServer(new FileServerOptions
@@ -102,7 +115,7 @@ namespace McMaster.DotNet.Server
             console.ForegroundColor = ConsoleColor.Green;
             foreach (var a in addresses.Addresses)
             {
-                console.WriteLine("  " + a);
+                console.WriteLine("  " + a + PathBase);
             }
 
             console.ResetColor();
@@ -115,6 +128,12 @@ namespace McMaster.DotNet.Server
                 // normalize to loopback if binding to IPAny
                 url = url.Replace("0.0.0.0", "localhost");
                 url = url.Replace("[::]", "localhost");
+
+                if (!string.IsNullOrEmpty(PathBase))
+                {
+                    url += PathBase;
+                }
+
                 LaunchBrowser(url);
             }
 
