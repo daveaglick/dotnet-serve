@@ -8,9 +8,11 @@ using System.Runtime.InteropServices;
 using System.Threading;
 using System.Threading.Tasks;
 using McMaster.Extensions.CommandLineUtils;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Hosting.Server.Features;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using IOPath = System.IO.Path;
 
@@ -73,6 +75,16 @@ namespace McMaster.DotNet.Server
                 .UseWebRoot(path)
                 .UseContentRoot(path)
                 .UseEnvironment("Production")
+                .ConfigureServices(s =>
+                {
+                    s.AddMvcCore()
+                        .WithRazorPagesRoot("/")
+                        .AddRazorPages(o =>
+                        {
+                            o.Conventions.Clear();
+                        });
+                    s.AddSingleton<IAuthorizationPolicyProvider, NullAuthPolicy>();
+                })
                 .Configure(app =>
                 {
                     app.UseStatusCodePages("text/html",
@@ -86,6 +98,8 @@ namespace McMaster.DotNet.Server
                             ServeUnknownFileTypes = true,
                         },
                     });
+
+                    app.UseMvcWithDefaultRoute();
                 })
                 .Build();
 
@@ -143,6 +157,18 @@ namespace McMaster.DotNet.Server
             }
 
             Process.Start(processName, ArgumentEscaper.EscapeAndConcatenate(args));
+        }
+
+        private class NullAuthPolicy : IAuthorizationPolicyProvider
+        {
+            public Task<AuthorizationPolicy> GetDefaultPolicyAsync()
+            {
+                var policy = new AuthorizationPolicyBuilder().Build();
+                return Task.FromResult(policy);
+            }
+
+            public Task<AuthorizationPolicy> GetPolicyAsync(string policyName)
+                => GetDefaultPolicyAsync();
         }
     }
 }
